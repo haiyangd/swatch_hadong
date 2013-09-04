@@ -1,0 +1,26 @@
+# A sample swatchrc file that demonstrates how to use perlcode to set up
+# counters and timestamps for two separate messages you want to watch for.
+# To see exactly what this file does, run the following command and then 
+# examine test.pl:
+#
+# swatch -c ./swatch.perlcode --dump-script test.pl
+
+perlcode 0 my $matches = 0;
+perlcode 0 my $last_match_time = localtime;
+perlcode 2 $matches++;
+perlcode 4 $matches = 0;
+perlcode 4 $last_match_time = localtime;
+
+watchfor /Session has expired/
+  threshold track_by=Session, type=both,count=10,seconds=1800
+  mail user1,subject=Session expired errors,message=Error: \'$_\' has been encountered $matches times since $last_match_time
+
+perlcode 0 my $m2 = 0;
+perlcode 0 my $lm2 = localtime;
+perlcode 2 $m2++;
+perlcode 4 $m2 = 0;
+perlcode 4 $lm2 = localtime;
+
+watchfor /Some other error message/
+  threshold track_by=message, type=both,count=10,seconds=1800
+  mail user2,subject=Some other error,message=Error: \'$_\' has been encountered $m2 times since $lm2

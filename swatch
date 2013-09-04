@@ -20,6 +20,9 @@ eval 'exec /usr/local/bin/perl  -S $0 ${1+"$@"}'
 #    along with this program; if not, write to the Free Software
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
+
+# This version of swatch is a fork of swatch 3.2.3 that can be found 
+# here: https://github.com/bpennypacker/swatch
  
 use strict;
 use English;
@@ -275,7 +278,7 @@ sub read_config {
 	$rec->{value} = $val if (length($val));
         push @records, $rec;
 	$rec = ();
-      } else { # depth is 2
+      } else { # depth is 2+
 	push(@{$rec->{actions}}, { action => lc($key),
 				   depth => $depth,
 				   value => $val });
@@ -462,6 +465,8 @@ POSIX::setsid() or die "Can't start new session: \$!";
   } else {
     $code .= qq[print \"\\n*** ${Me} version ${VERSION} (pid:$$) started at \" . `/bin/date` . \"\\n\";];
   }
+
+  $code .= "\n";
   
   $code .= qq[write_pid_file("$opt_pid_file"); \n] if (defined $opt_pid_file);
 
@@ -690,7 +695,7 @@ sub make_watchfor_block {
 
   foreach my $a_ref (@{$ref->{actions}}) {
     if ($a_ref->{action} eq 'perlcode' and $a_ref->{depth} == 2) {
-      $code .= "\t$a_ref->{value}\n";
+      $code .= "     $a_ref->{value}\n";
     }
   }
 
@@ -733,6 +738,14 @@ sub make_watchfor_block {
   }
   
   if (exists $ref->{"threshold"}) {
+
+    # Scan for perlcode level 4 options
+    foreach my $a_ref (@{$ref->{actions}}) {
+      if ($a_ref->{action} eq 'perlcode' and $a_ref->{depth} == 4) {
+        $code .= "        $a_ref->{value}\n";
+      }
+    }
+
     $code .= "     }\n";
   }
   
@@ -1330,9 +1343,15 @@ mail=sysad-pager@somehost.somedomain,when=1-6:8-17
  
 This permits you to easily insert random Perl code into your swatchrc file.
 The optional depth value tells swatch how deep into the code to put the perl 
-code. (0=outside the main loop, 1=inside the main loop (default), 2=just inside the 
-conditional used by the current watchfor statement, and 3=inside the throttle
-block).
+code:
+
+    0 : outside the main loop.
+    1 : inside the main loop, at the end of the loop (default)
+    2 : inside the start of the conditional used by the current watchfor
+        statement
+    3 : inside the throttle block
+    4 : inside the end of the threshold conditional used by the current 
+        watchfor statement
 
 Its intended use is to permit variable substitution. For example:
 
@@ -1341,12 +1360,22 @@ Its intended use is to permit variable substitution. For example:
 perlcode $syslog="^\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}.*";
  
 watchfor /$syslog hostname pppd/>
- 
+
 =back
 
 but any valid Perl is permitted.  Remember the semicolon, and make judicious
 use of the B<--dump-script> option if you run into trouble.
 
+B<NOTE>: perlcode statements should be put in your swatchrc file before
+the watchfor block in which you want to use them.  A perlcode block with
+a depth of 0 or 1 will be treated as a global statement so all statements
+with those depth will be placed appropriately no matter where they are
+defined in swatchrc.  A perlcode block with a depth of 2 or higher will
+only be applied to the subsequent watchfor block. See examples/swatchrc.perlcode 
+for an example.
+
+=back
+ 
 =head1 CONFIGURATION EXAMPLE
 
 =begin text 
@@ -1390,5 +1419,8 @@ when it receives a QUIT, TERM, or INT signal.
 Swatch is a SourceForge project whose project page is at 
 http://sourceforge.net/projects/swatch and homepage is at
 http://swatch.sourceforge.net
+
+This version of swatch is a fork of the SourceForge version which can be
+found at https://github.com/bpennypacker/swatch
 
 =cut
